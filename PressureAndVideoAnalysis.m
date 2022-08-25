@@ -111,8 +111,7 @@ title('Full pressure trace')
 
 clear i y pdata
 
-burrow_trace=figure;%TODO Add video frames to the right of this figure
-
+burrow_trace=figure;
 for i=1:length(sensors)
     j=1:2:2*length(sensors);
     subplot(length(sensors),2,j(i))
@@ -157,23 +156,30 @@ if bName == 'No '
     error 'Camera moved during the requested segment. Change the time bounds for the video.'
 end
 
+close(videoframe)
 %% Run through video analysis
 mkdir([savePath filesep experiment_notes.PressureDataFilename{exp_row} filesep '1 Image Differences']);
 mkdir([savePath filesep experiment_notes.PressureDataFilename{exp_row} filesep '2 Thresholded Images']);
 mkdir([savePath filesep experiment_notes.PressureDataFilename{exp_row} filesep '3 Skeletons']);
 
 se = strel('disk',2,8);
-frames = [1:numFrame/1000]; %Analyzes one frame per second
-a = vid.read(1);
+frames = round(linspace(first_behavior(1)*60,end_behavior,(end_behavior-first_behavior(1)*60)/100)); 
+a = vid.read(frames(1));
 for i =1:length(frames)-1
    
     b = vid.read(frames(i+1));
     c = imabsdiff(a,b); %take the difference between this frame and the previous one
     d = imadjust(rgb2gray(c)); %make the result grayscale and adjust the contrast to use the full range from 0-1
-    e = im2bw(d,0.5); %thresholds the image and makes it black and white
+    e = im2bw(d,0.95); %thresholds the image and makes it black and white
     a = b;
     e=imerode(e,se);
     f = bwskel(e);
+    
+    [y_points,x_points] = find(e);
+    
+    epoints = [x_points,y_points];
+    
+    save([savePath filesep experiment_notes.PressureDataFilename{exp_row} filesep '2 Thresholded Images' filesep 'Frame' num2str(i)], 'epoints');
     
     imwrite(c,[savePath filesep experiment_notes.PressureDataFilename{exp_row} filesep '1 Image Differences' filesep 'Frame' num2str(i) '.png']);
     imwrite(c,[savePath filesep experiment_notes.PressureDataFilename{exp_row} filesep '2 Thresholded Images' filesep 'Frame' num2str(i) '.png']);
@@ -181,8 +187,75 @@ for i =1:length(frames)-1
 
 end
 
-pause
+%% Create the color gradient for the video analysis figure
 
+c1 = [1 0 0]; %rgb value for the starting color
+c2 = [0 0 1]; %rgb value for the ending color
+
+%Creates a value determining the amount of color change between each frame
+cr=(c2(1)-c1(1))/(length(frames)-1);
+cg=(c2(2)-c1(2))/(length(frames)-1);
+cb=(c2(3)-c1(3))/(length(frames)-1);
+
+%Initializes matrices.
+gradient=zeros(length(frames),3);
+r=zeros(10,length(frames));
+g=zeros(10,length(frames));
+b=zeros(10,length(frames));
+%for each color step, increase/reduce the value of Intensity data.
+for j=1:length(frames)
+    gradient(j,1)=c1(1)+cr*(j-1);
+    gradient(j,2)=c1(2)+cg*(j-1);
+    gradient(j,3)=c1(3)+cb*(j-1);
+    r(:,j)=gradient(j,1);
+    g(:,j)=gradient(j,2);
+    b(:,j)=gradient(j,3);
+end
+
+%merge R G B matrix and obtain our image.
+imColGradient=cat(3,r,g,b);
+
+%% Create TickLabels for video analysis figure
+ColTicks= linspace(frames(1),frames(end),6);
+ColTicks=ColTicks/3600;
+ColTicks = round(ColTicks,2,'significant')
+TickLabels = {
+    [num2str(ColTicks(1)), ' min'];
+    [num2str(ColTicks(2)), ' min'];
+    [num2str(ColTicks(3)), ' min'];
+    [num2str(ColTicks(4)), ' min'];
+    [num2str(ColTicks(5)), ' min'];
+    [num2str(ColTicks(6)), ' min'];
+   }
+
+%% Show finished video analysis next to pressure trace of burrow
+figure(burrow_trace)
+
+subplot(2,4,3)
+imshow(vid.read(first_behavior(1)*60))
+title('Beginning of behavior')
+
+subplot(2,4,4)
+imshow(vid.read(end_behavior))
+title('End of behavior')
+
+subplot(2,2,4)
+imshow(vid.read(first_behavior(1)*60))
+hold on
+set(gca, 'YDir','reverse')
+for i = 1:(length(frames)-1)
+    load([savePath filesep experiment_notes.PressureDataFilename{exp_row} filesep '2 Thresholded Images' filesep 'Frame' num2str(i)]);
+    hold on
+    plot(epoints(:,1),epoints(:,2),'.','MarkerFaceColor',gradient(i,:),'MarkerEdgeColor',gradient(i,:))
+end
+
+colormap(gradient)
+ColBar=colorbar;
+ColBar.Ticks = [0,0.2,0.4,0.6,0.8,1];
+ColBar.TickLabels = TickLabels;
+title('Heatmap of changes over time between beginning and ending of behavior')
+ 
+pause
 
 
 
