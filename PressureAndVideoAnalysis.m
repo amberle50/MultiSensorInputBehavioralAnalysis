@@ -1,4 +1,4 @@
-
+%% THIS PROGRAM IS A WORK IN PROGRESS. PARTS MAY NOT YET WORK. BE YE WARNED.
 %% Logistics
 set(0,'DefaultFigureWindowStyle','docked')
 
@@ -45,14 +45,15 @@ data=timetable2table(data);
 
 clear flnm pressname presstype
 
-%% Load video file
+%% Load video file and video notes
 flnm=experiment_notes.VideoFileName{exp_row,:};
 vidname = flnm;
 vidtype = '.MOV';
+notetype = '.csv';
 
 vid=VideoReader([vidPath filesep vidname vidtype]);
-
-clear flnm vidname vidtype
+vidnote=readtable([vidPath filesep vidname notetype]);
+clear flnm vidname vidtype notetype
 
 %% Load calibration video
 flnm=experiment_notes.CalibrationFileName{exp_row,:};
@@ -103,11 +104,20 @@ for i=1:length(sensors)
     patch([first_behavior(1),first_behavior(1) first_behavior(2),first_behavior(2)],[y(1),y(2),y(2),y(1)],'y','FaceAlpha',0.5,'EdgeColor','y')
 %     patch([second_behavior(1),second_behavior(1) second_behavior(2),second_behavior(2)],[y(1),y(2),y(2),y(1)],'y','FaceAlpha',0.5,'EdgeColor','y')
 %     patch([third_behavior(1),third_behavior(1) third_behavior(2),third_behavior(2)],[y(1),y(2),y(2),y(1)],'y','FaceAlpha',0.5,'EdgeColor','y')
-% 
+
+for j=1:height(vidnote)
+    x=vidnote.CameraTime_s_(j);
+    l=mean(ylim);
+    text(x,l,vidnote.ID(j))
+    patch([x,x],ylim,'g','EdgeColor','g')
+    hold on
+end
+
 end
 xlabel('Time (s)')
 subplot(length(sensors),1,1)
 title('Full pressure trace')
+
 
 clear i y pdata
 
@@ -125,13 +135,20 @@ for i=1:length(sensors)
 %     patch([second_behavior(1),second_behavior(1) second_behavior(2),second_behavior(2)],[y(1),y(2),y(2),y(1)],'y','FaceAlpha',0.5,'EdgeColor','y')
 %     patch([third_behavior(1),third_behavior(1) third_behavior(2),third_behavior(2)],[y(1),y(2),y(2),y(1)],'y','FaceAlpha',0.5,'EdgeColor','y')
 % 
+
+for j=1:height(vidnote)
+    x=vidnote.CameraTime_s_(j);
+    l=mean(ylim);
+    text(x,l,vidnote.ID(j))
+    patch([x,x],ylim,'g','EdgeColor','g')
+    hold on
+end
 end
 xlabel('Time (s)')
 subplot(length(sensors),2,1)
 title('Burrowing pressure trace')
 
 clear i y pdata j
-
 
 %% Look at video data
 burrow_start_v=experiment_notes.WhenDidBurrowingStart__secsVideoTime_(exp_row,:);
@@ -157,6 +174,7 @@ if bName == 'No '
 end
 
 close(videoframe)
+
 %% Run through video analysis
 mkdir([savePath filesep experiment_notes.PressureDataFilename{exp_row} filesep '1 Image Differences']);
 mkdir([savePath filesep experiment_notes.PressureDataFilename{exp_row} filesep '2 Thresholded Images']);
